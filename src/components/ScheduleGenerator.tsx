@@ -104,21 +104,35 @@ export const ScheduleGenerator: React.FC = () => {
       return;
     }
 
-    // ヘッダー行
-    const csvContent: string[][] = [
-      ['日付', '週番号', 'ユーザ名', 'Slack ID']
-    ];
+    // ヘッダー行を動的に生成
+    const maxPresenters = Math.max(...state.schedule.map(s => s.presenters.length));
+    const headers = ['日付', '週番号'];
     
-    // 各セッションの発表者を個別の行として追加
+    for (let i = 1; i <= maxPresenters; i++) {
+      headers.push(`ユーザ名${i}`, `ユーザ${i}Slack ID`);
+    }
+    
+    const csvContent: string[][] = [headers];
+    
+    // 各セッションを1行として追加
     state.schedule.forEach(session => {
+      const row = [
+        format(session.date, 'yyyy-MM-dd'),
+        session.weekNumber.toString()
+      ];
+      
+      // 各発表者の情報を横に展開
       session.presenters.forEach(presenter => {
-        csvContent.push([
-          format(session.date, 'yyyy-MM-dd'),
-          session.weekNumber.toString(),
-          presenter.name,
-          presenter.slackId
-        ]);
+        row.push(presenter.name, presenter.slackId);
       });
+      
+      // 空のセルを埋める（発表者数が最大数に満たない場合）
+      const remainingCells = (maxPresenters - session.presenters.length) * 2;
+      for (let i = 0; i < remainingCells; i++) {
+        row.push('');
+      }
+      
+      csvContent.push(row);
     });
 
     const csvString = csvContent.map(row => 
