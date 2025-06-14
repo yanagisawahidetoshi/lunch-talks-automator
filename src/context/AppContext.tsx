@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { AppState, Participant, ScheduleConfig, ScheduleSession } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -83,18 +82,50 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const [storedState, setStoredState] = useLocalStorage('ltSchedulerState', initialState);
+  const [isInitialized, setIsInitialized] = React.useState(false);
 
   // Load state from localStorage on mount
   useEffect(() => {
-    if (storedState && storedState.participants.length > 0) {
-      dispatch({ type: 'LOAD_STATE', payload: storedState });
+    if (!isInitialized && storedState && storedState.participants.length > 0) {
+      // 日付オブジェクトを復元
+      const restoredState = {
+        ...storedState,
+        config: storedState.config ? {
+          ...storedState.config,
+          startDate: storedState.config.startDate ? new Date(storedState.config.startDate) : null
+        } : null,
+        schedule: storedState.schedule.map(session => ({
+          ...session,
+          date: new Date(session.date)
+        })),
+        lastGenerated: storedState.lastGenerated ? new Date(storedState.lastGenerated) : null
+      };
+      dispatch({ type: 'LOAD_STATE', payload: restoredState });
+      setIsInitialized(true);
+    } else if (!isInitialized) {
+      setIsInitialized(true);
     }
-  }, []);
+  }, [isInitialized, storedState]);
 
-  // Save state to localStorage whenever it changes
+  // Save state to localStorage whenever it changes (防止無限ループ)
   useEffect(() => {
-    setStoredState(state);
-  }, [state, setStoredState]);
+    if (isInitialized) {
+      // 日付をシリアライズ可能な形式に変換
+      const serializableState = {
+        ...state,
+        config: state.config ? {
+          ...state.config,
+          startDate: state.config.startDate ? state.config.startDate.toISOString() : null
+        } : null,
+        schedule: state.schedule.map(session => ({
+          ...session,
+          date: session.date.toISOString()
+        })),
+        lastGenerated: state.lastGenerated ? state.lastGenerated.toISOString() : null
+      };
+      setStoredState(serializableState);
+    }
+  }, [state, setStoredState, isInitialized]);
 
   const addParticipant = (participant: Omit<Participant, 'id'>) => {
     dispatch({ type: 'ADD_PARTICIPANT', payload: participant });
