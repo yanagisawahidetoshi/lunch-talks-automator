@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -6,12 +5,12 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Trash2, UserPlus, Upload, Users } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { useApp } from '../context/AppContext';
 import { Participant, BulkImportData } from '../types';
 import { useToast } from '../hooks/use-toast';
 
 export const ParticipantManager: React.FC = () => {
-  const { participants, addParticipant, removeParticipant, bulkAddParticipants } = useAppContext();
+  const { state, addParticipant, removeParticipant, bulkAddParticipants } = useApp();
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [slackId, setSlackId] = useState('');
@@ -28,8 +27,7 @@ export const ParticipantManager: React.FC = () => {
       return;
     }
 
-    const participant: Participant = {
-      id: crypto.randomUUID(),
+    const participant: Omit<Participant, 'id'> = {
       name: name.trim(),
       slackId: slackId.trim(),
     };
@@ -173,14 +171,14 @@ export const ParticipantManager: React.FC = () => {
 
         {/* Participants List */}
         <div className="space-y-2">
-          <Label>参加者一覧 ({participants.length}人)</Label>
-          {participants.length === 0 ? (
+          <Label>参加者一覧 ({state.participants.length}人)</Label>
+          {state.participants.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               参加者が登録されていません
             </p>
           ) : (
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {participants.map((participant) => (
+              {state.participants.map((participant) => (
                 <div
                   key={participant.id}
                   className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"

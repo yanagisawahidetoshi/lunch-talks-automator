@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -11,10 +10,15 @@ import { CalendarIcon, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { cn } from '../lib/utils';
-import { useAppContext } from '../context/AppContext';
+import { useApp } from '../context/AppContext';
 
 export const ScheduleConfig: React.FC = () => {
-  const { config, updateConfig } = useAppContext();
+  const { state, setConfig } = useApp();
+  const config = state.config;
+
+  const updateConfig = (updates: any) => {
+    setConfig({ ...config, ...updates });
+  };
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
