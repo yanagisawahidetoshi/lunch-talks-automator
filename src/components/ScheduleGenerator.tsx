@@ -1,259 +1,182 @@
 
-import React, { useState } from 'react';
-import { Calendar, Users, Download, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { format, addDays, addWeeks } from 'date-fns';
-import { useApp } from '../context/AppContext';
-import { useToast } from '@/hooks/use-toast';
-import { ScheduleSession, Participant } from '../types';
+import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Calendar, Download, Play, Users } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
+import { format } from 'date-fns';
+import { ja } from 'date-fns/locale';
+import { useToast } from '../hooks/use-toast';
 
-// Simple Japanese holidays for 2024-2025 (can be expanded)
-const japaneseHolidays = [
-  new Date('2024-01-01'), // New Year's Day
-  new Date('2024-01-08'), // Coming of Age Day
-  new Date('2024-02-11'), // National Foundation Day
-  new Date('2024-02-23'), // Emperor's Birthday
-  new Date('2024-03-20'), // Vernal Equinox Day
-  new Date('2024-04-29'), // Showa Day
-  new Date('2024-05-03'), // Constitution Memorial Day
-  new Date('2024-05-04'), // Greenery Day
-  new Date('2024-05-05'), // Children's Day
-  new Date('2024-07-15'), // Marine Day
-  new Date('2024-08-11'), // Mountain Day
-  new Date('2024-09-16'), // Respect for the Aged Day
-  new Date('2024-09-23'), // Autumnal Equinox Day
-  new Date('2024-10-14'), // Sports Day
-  new Date('2024-11-03'), // Culture Day
-  new Date('2024-11-23'), // Labor Thanksgiving Day
-  // 2025 holidays
-  new Date('2025-01-01'), // New Year's Day
-  new Date('2025-01-13'), // Coming of Age Day
-  new Date('2025-02-11'), // National Foundation Day
-  new Date('2025-02-23'), // Emperor's Birthday
-  new Date('2025-03-20'), // Vernal Equinox Day
-  new Date('2025-04-29'), // Showa Day
-  new Date('2025-05-03'), // Constitution Memorial Day
-  new Date('2025-05-04'), // Greenery Day
-  new Date('2025-05-05'), // Children's Day
-  new Date('2025-07-21'), // Marine Day
-  new Date('2025-08-11'), // Mountain Day
-  new Date('2025-09-15'), // Respect for the Aged Day
-  new Date('2025-09-23'), // Autumnal Equinox Day
-  new Date('2025-10-13'), // Sports Day
-  new Date('2025-11-03'), // Culture Day
-  new Date('2025-11-23'), // Labor Thanksgiving Day
-];
-
-function isHoliday(date: Date): boolean {
-  return japaneseHolidays.some(holiday => 
-    holiday.getFullYear() === date.getFullYear() &&
-    holiday.getMonth() === date.getMonth() &&
-    holiday.getDate() === date.getDate()
-  );
-}
-
-function isWeekend(date: Date): boolean {
-  const day = date.getDay();
-  return day === 0 || day === 6; // Sunday or Saturday
-}
-
-export function ScheduleGenerator() {
-  const { state, setSchedule } = useApp();
+export const ScheduleGenerator: React.FC = () => {
+  const { participants, config, schedule, generateSchedule, lastGenerated } = useAppContext();
   const { toast } = useToast();
-  const [isGenerating, setIsGenerating] = useState(false);
 
-  const canGenerate = state.config && state.participants.length >= state.config.presentersPerSession;
+  const canGenerate = participants.length > 0 && config?.startDate;
 
-  const generateSchedule = async () => {
-    if (!state.config || !canGenerate) return;
-
-    setIsGenerating(true);
-    console.log('Starting schedule generation...');
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing
-
-      const schedule: ScheduleSession[] = [];
-      const participantQueue = [...state.participants];
-      let currentDate = new Date(state.config.startDate);
-      let weekNumber = 1;
-
-      // Shuffle participants for fair rotation
-      for (let i = participantQueue.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [participantQueue[i], participantQueue[j]] = [participantQueue[j], participantQueue[i]];
-      }
-
-      let participantIndex = 0;
-      
-      // Generate schedule until everyone has presented at least once
-      while (participantIndex < participantQueue.length) {
-        // Find next valid date
-        while (isWeekend(currentDate) || isHoliday(currentDate) || currentDate.getDay() !== state.config.dayOfWeek) {
-          currentDate = addDays(currentDate, 1);
-        }
-
-        // Select presenters for this session
-        const presenters: Participant[] = [];
-        for (let i = 0; i < state.config.presentersPerSession && participantIndex < participantQueue.length; i++) {
-          presenters.push(participantQueue[participantIndex]);
-          participantIndex++;
-        }
-
-        schedule.push({
-          date: new Date(currentDate),
-          presenters,
-          weekNumber,
-        });
-
-        // Move to next session date
-        currentDate = addDays(currentDate, state.config.frequency * 7);
-        weekNumber++;
-      }
-
-      setSchedule(schedule);
-      console.log('Schedule generated:', schedule);
-      
+  const handleGenerate = () => {
+    if (!canGenerate) {
       toast({
-        title: "Schedule Generated",
-        description: `Created ${schedule.length} sessions for ${state.participants.length} participants`,
-      });
-    } catch (error) {
-      console.error('Schedule generation error:', error);
-      toast({
-        title: "Generation Failed",
-        description: "Failed to generate schedule. Please try again.",
+        title: "エラー",
+        description: "参加者とスケジュール設定を完了してください。",
         variant: "destructive",
       });
-    } finally {
-      setIsGenerating(false);
+      return;
+    }
+
+    try {
+      generateSchedule();
+      toast({
+        title: "スケジュール生成完了",
+        description: `${schedule.length}回分のスケジュールを生成しました。`,
+      });
+    } catch (error) {
+      toast({
+        title: "生成エラー",
+        description: "スケジュールの生成中にエラーが発生しました。",
+        variant: "destructive",
+      });
     }
   };
 
-  const exportToCsv = () => {
-    if (state.schedule.length === 0) return;
+  const handleExportCSV = () => {
+    if (schedule.length === 0) {
+      toast({
+        title: "エラー",
+        description: "先にスケジュールを生成してください。",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const csvData = [
-      ['Date', 'Week', 'Presenters', 'Slack IDs'],
-      ...state.schedule.map(session => [
+    const csvContent = [
+      ['日付', '週番号', '発表者', 'Slack ID'],
+      ...schedule.map(session => [
         format(session.date, 'yyyy-MM-dd'),
         session.weekNumber.toString(),
-        session.presenters.map(p => p.name).join('; '),
-        session.presenters.map(p => p.slackId).join('; '),
+        session.presenters.map(p => p.name).join('・'),
+        session.presenters.map(p => p.slackId).join('・')
       ])
     ];
 
-    const csvContent = csvData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const csvString = csvContent.map(row => 
+      row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
+    
     link.setAttribute('href', url);
     link.setAttribute('download', `LT_Schedule_${format(new Date(), 'yyyy-MM-dd')}.csv`);
     link.style.visibility = 'hidden';
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     toast({
-      title: "CSV Exported",
-      description: "Schedule has been downloaded as CSV file",
+      title: "CSVエクスポート完了",
+      description: "スケジュールをCSVファイルでダウンロードしました。",
     });
   };
 
   return (
-    <Card className="w-full">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          Schedule Generator
+          スケジュール生成
         </CardTitle>
+        <CardDescription>
+          ライトニングトークのスケジュールを自動生成します
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {!canGenerate && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 rounded-lg p-4">
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              {!state.config 
-                ? "Please configure the schedule settings first."
-                : `Need at least ${state.config.presentersPerSession} participants to generate schedule.`
-              }
+        {/* Generation Status */}
+        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+          <div>
+            <p className="font-medium">
+              {canGenerate ? "生成準備完了" : "設定が不完全です"}
             </p>
+            <p className="text-sm text-muted-foreground">
+              参加者: {participants.length}人 | 
+              設定: {config?.startDate ? "完了" : "未完了"}
+            </p>
+          </div>
+          <Badge variant={canGenerate ? "default" : "secondary"}>
+            {canGenerate ? "準備完了" : "設定中"}
+          </Badge>
+        </div>
+
+        {/* Generate Button */}
+        <Button 
+          onClick={handleGenerate} 
+          disabled={!canGenerate}
+          className="w-full"
+          size="lg"
+        >
+          <Play className="h-4 w-4 mr-2" />
+          スケジュール生成
+        </Button>
+
+        {/* Schedule Preview */}
+        {schedule.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">生成されたスケジュール</h4>
+              <Button onClick={handleExportCSV} variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                CSV出力
+              </Button>
+            </div>
+            
+            <div className="max-h-80 overflow-y-auto space-y-2">
+              {schedule.slice(0, 10).map((session, index) => (
+                <div
+                  key={index}
+                  className="p-3 border rounded-lg bg-card"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium">
+                      {format(session.date, 'M月d日 (EEEE)', { locale: ja })}
+                    </span>
+                    <Badge variant="outline">第{session.weekNumber}週</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">
+                      {session.presenters.map(p => p.name).join(' ・ ')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {schedule.length > 10 && (
+                <p className="text-sm text-muted-foreground text-center">
+                  他 {schedule.length - 10} 件...
+                </p>
+              )}
+            </div>
+
+            {lastGenerated && (
+              <p className="text-xs text-muted-foreground">
+                最終生成: {format(lastGenerated, 'yyyy-MM-dd HH:mm', { locale: ja })}
+              </p>
+            )}
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button 
-            onClick={generateSchedule}
-            disabled={!canGenerate || isGenerating}
-            className="flex-1"
-          >
-            {isGenerating ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Calendar className="h-4 w-4 mr-2" />
-            )}
-            {isGenerating ? 'Generating...' : 'Generate Schedule'}
-          </Button>
-          
-          {state.schedule.length > 0 && (
-            <Button variant="outline" onClick={exportToCsv}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-          )}
-        </div>
-
-        {state.schedule.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium">Generated Schedule</h4>
-              <Badge variant="secondary">
-                {state.schedule.length} sessions
-              </Badge>
-            </div>
-            
-            <div className="max-h-96 overflow-y-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Week</TableHead>
-                    <TableHead>Presenters</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {state.schedule.map((session, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-mono">
-                        {format(session.date, 'MMM dd, yyyy')}
-                      </TableCell>
-                      <TableCell>{session.weekNumber}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {session.presenters.map((presenter) => (
-                            <Badge key={presenter.id} variant="outline">
-                              <Users className="h-3 w-3 mr-1" />
-                              {presenter.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {state.lastGenerated && (
-              <p className="text-sm text-muted-foreground">
-                Last generated: {format(state.lastGenerated, 'PPpp')}
-              </p>
-            )}
+        {/* Empty State */}
+        {schedule.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-sm">
+              スケジュールを生成すると、ここに表示されます
+            </p>
           </div>
         )}
       </CardContent>
     </Card>
   );
-}
+};

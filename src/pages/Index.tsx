@@ -12,10 +12,10 @@ const Index = () => {
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-white mb-2">
-              Lunch Lightning Talk Scheduler
+              ランチライトニングトーク スケジューラー
             </h1>
             <p className="text-slate-300 max-w-2xl mx-auto">
-              Automate your lunch lightning talk scheduling with smart rotation, holiday awareness, and Slack integration.
+              スマートなローテーション、祝日認識、Slack連携により、ランチライトニングトークのスケジューリングを自動化します。
             </p>
           </div>
 
@@ -40,7 +40,7 @@ const Index = () => {
           {/* Footer */}
           <div className="text-center mt-12 text-slate-400">
             <p className="text-sm">
-              Built with ❤️ for productive lunch sessions
+              生産的なランチセッションのために ❤️ で作られました
             </p>
           </div>
         </div>
