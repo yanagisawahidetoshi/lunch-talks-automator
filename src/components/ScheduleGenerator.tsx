@@ -1,19 +1,71 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Calendar, Download, Play, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { format } from 'date-fns';
+import { format, addWeeks, isSameDay, setDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useToast } from '../hooks/use-toast';
+import { Participant, ScheduleSession } from '../types';
 
 export const ScheduleGenerator: React.FC = () => {
   const { state, setSchedule } = useApp();
   const { toast } = useToast();
 
   const canGenerate = state.participants.length > 0 && state.config?.startDate;
+
+  const generateSchedule = (): ScheduleSession[] => {
+    if (!state.config || state.participants.length === 0) {
+      return [];
+    }
+
+    const { startDate, dayOfWeek, frequency, presentersPerSession } = state.config;
+    const participants = [...state.participants];
+    const schedule: ScheduleSession[] = [];
+    
+    // 参加者をシャッフル
+    const shuffledParticipants = participants.sort(() => Math.random() - 0.5);
+    
+    // 開始日を設定された曜日に調整
+    let currentDate = new Date(startDate);
+    const startDayOfWeek = currentDate.getDay();
+    
+    if (startDayOfWeek !== dayOfWeek) {
+      // 次の指定曜日まで日付を進める
+      const daysToAdd = (dayOfWeek - startDayOfWeek + 7) % 7;
+      currentDate = addWeeks(currentDate, 0);
+      currentDate.setDate(currentDate.getDate() + daysToAdd);
+    }
+    
+    let weekNumber = 1;
+    let participantIndex = 0;
+    
+    // 全員が発表するまでスケジュールを生成
+    while (participantIndex < shuffledParticipants.length) {
+      const presenters: Participant[] = [];
+      
+      // 1回あたりの発表者数分を選択
+      for (let i = 0; i < presentersPerSession && participantIndex < shuffledParticipants.length; i++) {
+        presenters.push(shuffledParticipants[participantIndex]);
+        participantIndex++;
+      }
+      
+      if (presenters.length > 0) {
+        schedule.push({
+          date: new Date(currentDate),
+          presenters,
+          weekNumber
+        });
+        
+        // 次の開催日を計算
+        currentDate = addWeeks(currentDate, frequency);
+        weekNumber += frequency;
+      }
+    }
+    
+    return schedule;
+  };
 
   const handleGenerate = () => {
     if (!canGenerate) {
@@ -26,19 +78,12 @@ export const ScheduleGenerator: React.FC = () => {
     }
 
     try {
-      // Placeholder schedule generation logic
-      const mockSchedule = [
-        {
-          date: new Date(),
-          weekNumber: 1,
-          presenters: state.participants.slice(0, state.config?.presentersPerSession || 2)
-        }
-      ];
+      const newSchedule = generateSchedule();
       
-      setSchedule(mockSchedule);
+      setSchedule(newSchedule);
       toast({
         title: "スケジュール生成完了",
-        description: `${mockSchedule.length}回分のスケジュールを生成しました。`,
+        description: `${newSchedule.length}回分のスケジュールを生成しました。`,
       });
     } catch (error) {
       toast({
@@ -59,15 +104,22 @@ export const ScheduleGenerator: React.FC = () => {
       return;
     }
 
-    const csvContent = [
-      ['日付', '週番号', '発表者', 'Slack ID'],
-      ...state.schedule.map(session => [
-        format(session.date, 'yyyy-MM-dd'),
-        session.weekNumber.toString(),
-        session.presenters.map(p => p.name).join('・'),
-        session.presenters.map(p => p.slackId).join('・')
-      ])
+    // ヘッダー行
+    const csvContent: string[][] = [
+      ['日付', '週番号', 'ユーザ名', 'Slack ID']
     ];
+    
+    // 各セッションの発表者を個別の行として追加
+    state.schedule.forEach(session => {
+      session.presenters.forEach(presenter => {
+        csvContent.push([
+          format(session.date, 'yyyy-MM-dd'),
+          session.weekNumber.toString(),
+          presenter.name,
+          presenter.slackId
+        ]);
+      });
+    });
 
     const csvString = csvContent.map(row => 
       row.map(cell => `"${cell}"`).join(',')
