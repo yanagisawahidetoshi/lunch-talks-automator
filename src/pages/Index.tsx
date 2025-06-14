@@ -7,14 +7,14 @@ import { AppProvider } from '../context/AppContext';
 const Index = () => {
   return (
     <AppProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
               ランチライトニングトーク スケジューラー
             </h1>
-            <p className="text-slate-300 max-w-2xl mx-auto">
+            <p className="text-slate-600 max-w-2xl mx-auto">
               スマートなローテーション、祝日認識、Slack連携により、ランチライトニングトークのスケジューリングを自動化します。
             </p>
           </div>
@@ -38,7 +38,7 @@ const Index = () => {
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-12 text-slate-400">
+          <div className="text-center mt-12 text-slate-500">
             <p className="text-sm">
               生産的なランチセッションのために ❤️ で作られました
             </p>
