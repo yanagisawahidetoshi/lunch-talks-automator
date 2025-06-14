@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { AppState, Participant, ScheduleConfig, ScheduleSession } from '../types';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface AppContextType {
   state: AppState;
@@ -20,7 +19,7 @@ type AppAction =
   | { type: 'BULK_ADD_PARTICIPANTS'; payload: Omit<Participant, 'id'>[] }
   | { type: 'SET_CONFIG'; payload: ScheduleConfig }
   | { type: 'SET_SCHEDULE'; payload: ScheduleSession[] }
-  | { type: 'LOAD_STATE'; payload: AppState }
+  | { type: 'LOAD_PARTICIPANTS'; payload: Participant[] }
   | { type: 'CLEAR_ALL' };
 
 const initialState: AppState = {
@@ -68,8 +67,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         schedule: action.payload,
         lastGenerated: new Date(),
       };
-    case 'LOAD_STATE':
-      return action.payload;
+    case 'LOAD_PARTICIPANTS':
+      return {
+        ...state,
+        participants: action.payload,
+      };
     case 'CLEAR_ALL':
       return initialState;
     default:
@@ -81,51 +83,30 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const [storedState, setStoredState] = useLocalStorage('ltSchedulerState', initialState);
-  const [isInitialized, setIsInitialized] = React.useState(false);
 
-  // Load state from localStorage on mount
+  // 参加者データのみをlocalStorageから読み込み
   useEffect(() => {
-    if (!isInitialized && storedState && storedState.participants.length > 0) {
-      // 日付オブジェクトを復元
-      const restoredState = {
-        ...storedState,
-        config: storedState.config ? {
-          ...storedState.config,
-          startDate: storedState.config.startDate ? new Date(storedState.config.startDate) : null
-        } : null,
-        schedule: storedState.schedule.map(session => ({
-          ...session,
-          date: new Date(session.date)
-        })),
-        lastGenerated: storedState.lastGenerated ? new Date(storedState.lastGenerated) : null
-      };
-      dispatch({ type: 'LOAD_STATE', payload: restoredState });
-      setIsInitialized(true);
-    } else if (!isInitialized) {
-      setIsInitialized(true);
+    try {
+      const savedParticipants = localStorage.getItem('ltSchedulerParticipants');
+      if (savedParticipants) {
+        const participants = JSON.parse(savedParticipants);
+        if (Array.isArray(participants) && participants.length > 0) {
+          dispatch({ type: 'LOAD_PARTICIPANTS', payload: participants });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load participants from localStorage:', error);
     }
-  }, [isInitialized, storedState]);
+  }, []);
 
-  // Save state to localStorage whenever it changes (防止無限ループ)
+  // 参加者データのみをlocalStorageに保存
   useEffect(() => {
-    if (isInitialized) {
-      // 日付をシリアライズ可能な形式に変換
-      const serializableState = {
-        ...state,
-        config: state.config ? {
-          ...state.config,
-          startDate: state.config.startDate ? state.config.startDate.toISOString() : null
-        } : null,
-        schedule: state.schedule.map(session => ({
-          ...session,
-          date: session.date.toISOString()
-        })),
-        lastGenerated: state.lastGenerated ? state.lastGenerated.toISOString() : null
-      };
-      setStoredState(serializableState);
+    try {
+      localStorage.setItem('ltSchedulerParticipants', JSON.stringify(state.participants));
+    } catch (error) {
+      console.error('Failed to save participants to localStorage:', error);
     }
-  }, [state, setStoredState, isInitialized]);
+  }, [state.participants]);
 
   const addParticipant = (participant: Omit<Participant, 'id'>) => {
     dispatch({ type: 'ADD_PARTICIPANT', payload: participant });
