@@ -2,7 +2,6 @@
 export interface Participant {
   id: string;
   name: string;
-  slackId: string;
 }
 
 export interface ScheduleConfig {
@@ -27,5 +26,4 @@ export interface AppState {
 
 export interface BulkImportData {
   name: string;
-  slackId: string;
 }

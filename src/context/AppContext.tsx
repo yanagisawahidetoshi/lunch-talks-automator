@@ -24,7 +24,12 @@ type AppAction =
 
 const initialState: AppState = {
   participants: [],
-  config: null,
+  config: {
+    startDate: new Date(),
+    dayOfWeek: 5, // Friday
+    frequency: 1, // Weekly
+    presentersPerSession: 1
+  },
   schedule: [],
   lastGenerated: null,
 };

@@ -13,15 +13,14 @@ export const ParticipantManager: React.FC = () => {
   const { state, addParticipant, removeParticipant, bulkAddParticipants } = useApp();
   const { toast } = useToast();
   const [name, setName] = useState('');
-  const [slackId, setSlackId] = useState('');
   const [bulkData, setBulkData] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
 
   const handleAddParticipant = () => {
-    if (!name.trim() || !slackId.trim()) {
+    if (!name.trim()) {
       toast({
         title: "エラー",
-        description: "名前とSlack IDを入力してください。",
+        description: "名前を入力してください。",
         variant: "destructive",
       });
       return;
@@ -29,12 +28,10 @@ export const ParticipantManager: React.FC = () => {
 
     const participant: Omit<Participant, 'id'> = {
       name: name.trim(),
-      slackId: slackId.trim(),
     };
 
     addParticipant(participant);
     setName('');
-    setSlackId('');
     
     toast({
       title: "参加者を追加しました",
@@ -57,11 +54,10 @@ export const ParticipantManager: React.FC = () => {
       const importData: BulkImportData[] = [];
 
       for (const line of lines) {
-        const parts = line.split(/[,\t]/).map(p => p.trim());
-        if (parts.length >= 2 && parts[0] && parts[1]) {
+        const name = line.trim();
+        if (name) {
           importData.push({
-            name: parts[0],
-            slackId: parts[1],
+            name: name,
           });
         }
       }
@@ -69,7 +65,7 @@ export const ParticipantManager: React.FC = () => {
       if (importData.length === 0) {
         toast({
           title: "エラー",
-          description: "有効なデータが見つかりません。形式：名前,Slack ID",
+          description: "有効なデータが見つかりません。1行に1つの名前を入力してください。",
           variant: "destructive",
         });
         return;
@@ -106,25 +102,14 @@ export const ParticipantManager: React.FC = () => {
       <CardContent className="space-y-6">
         {/* Add Single Participant */}
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="name">名前</Label>
-              <Input
-                id="name"
-                placeholder="田中太郎"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="slackId">Slack ID</Label>
-              <Input
-                id="slackId"
-                placeholder="@tanaka.taro"
-                value={slackId}
-                onChange={(e) => setSlackId(e.target.value)}
-              />
-            </div>
+          <div>
+            <Label htmlFor="name">名前</Label>
+            <Input
+              id="name"
+              placeholder="田中太郎"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
           <Button onClick={handleAddParticipant} className="w-full">
             <UserPlus className="h-4 w-4 mr-2" />
@@ -145,10 +130,10 @@ export const ParticipantManager: React.FC = () => {
           
           {showBulkImport && (
             <div className="space-y-2">
-              <Label htmlFor="bulkData">一括データ (名前,Slack ID)</Label>
+              <Label htmlFor="bulkData">一括データ (1行に1名ずつ)</Label>
               <Textarea
                 id="bulkData"
-                placeholder="田中太郎,@tanaka.taro&#10;佐藤花子,@sato.hanako&#10;山田次郎,@yamada.jiro"
+                placeholder="田中太郎&#10;佐藤花子&#10;山田次郎"
                 value={bulkData}
                 onChange={(e) => setBulkData(e.target.value)}
                 rows={4}
@@ -185,9 +170,6 @@ export const ParticipantManager: React.FC = () => {
                 >
                   <div>
                     <p className="font-medium">{participant.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {participant.slackId}
-                    </p>
                   </div>
                   <Button
                     variant="ghost"

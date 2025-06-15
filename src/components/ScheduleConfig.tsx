@@ -17,7 +17,13 @@ export const ScheduleConfig: React.FC = () => {
   const config = state.config;
 
   const updateConfig = (updates: any) => {
-    setConfig({ ...config, ...updates });
+    const currentConfig = config || {
+      startDate: new Date(),
+      dayOfWeek: 5, // Friday
+      frequency: 1, // Weekly
+      presentersPerSession: 1
+    };
+    setConfig({ ...currentConfig, ...updates });
   };
 
   const handleDateSelect = (date: Date | undefined) => {

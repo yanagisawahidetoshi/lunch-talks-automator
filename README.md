@@ -1,73 +1,73 @@
-# Welcome to your Lovable project
+# ランチライトニングトークスケジューラー
 
-## Project info
+会社のランチタイムライトニングトーク（LT）のスケジュールを自動生成する React アプリケーションです。
 
-**URL**: https://lovable.dev/projects/0a5d3c9f-571e-44fd-ba72-622759b1639b
+## 機能
 
-## How can I edit this code?
+- 参加者の管理（追加・削除・一括インポート）
+- スケジュール設定（開始日、曜日、頻度、発表者数）
+- 自動ローテーション生成
+- CSV 出力機能
 
-There are several ways of editing your application.
+## CSV 出力形式のカスタマイズ
 
-**Use Lovable**
+CSV 出力の形式を変更したい場合は、`src/components/ScheduleGenerator.tsx`の`handleExportCSV`関数を編集してください。
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0a5d3c9f-571e-44fd-ba72-622759b1639b) and start prompting.
+### 現在の出力形式
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```csv
+日付,週番号,ユーザ名1,ユーザ名2,...
+2024-01-12,1,田中太郎,佐藤花子
+2024-01-19,2,山田次郎,鈴木一郎
 ```
 
-**Edit a file directly in GitHub**
+### カスタマイズ例
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+#### 1. 縦展開形式（1 行 1 発表者）に変更する場合
 
-**Use GitHub Codespaces**
+`handleExportCSV`関数内の以下の部分を変更：
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```typescript
+// 変更前：横展開形式
+const headers = ["日付", "週番号"];
+for (let i = 1; i <= maxPresenters; i++) {
+  headers.push(`ユーザ名${i}`);
+}
 
-## What technologies are used for this project?
+// 変更後：縦展開形式
+const headers = ["日付", "週番号", "ユーザ名"];
+const csvContent: string[][] = [headers];
 
-This project is built with:
+state.schedule.forEach((session) => {
+  session.presenters.forEach((presenter) => {
+    csvContent.push([
+      format(session.date, "yyyy-MM-dd"),
+      session.weekNumber.toString(),
+      presenter.name,
+    ]);
+  });
+});
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+#### 2. 日付形式を変更する場合
 
-## How can I deploy this project?
+```typescript
+// 変更前：yyyy-MM-dd形式
+format(session.date, "yyyy-MM-dd");
 
-Simply open [Lovable](https://lovable.dev/projects/0a5d3c9f-571e-44fd-ba72-622759b1639b) and click on Share -> Publish.
+// 変更後：M月d日形式
+format(session.date, "M月d日", { locale: ja });
+```
 
-## Can I connect a custom domain to my Lovable project?
+#### 3. 追加情報を含める場合
 
-Yes, you can!
+```typescript
+const headers = ["日付", "曜日", "週番号", "ユーザ名"];
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+// 曜日情報を追加
+const row = [
+  format(session.date, "yyyy-MM-dd"),
+  format(session.date, "EEEE", { locale: ja }),
+  session.weekNumber.toString(),
+];
+```

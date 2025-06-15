@@ -4,10 +4,11 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Calendar, Download, Play, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { format, addWeeks, isSameDay, setDay } from 'date-fns';
+import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useToast } from '../hooks/use-toast';
-import { Participant, ScheduleSession } from '../types';
+import { ScheduleSession } from '../types';
+import { generateSchedule as generateScheduleUtil } from '../utils/scheduleGenerator';
 
 export const ScheduleGenerator: React.FC = () => {
   const { state, setSchedule } = useApp();
@@ -20,51 +21,7 @@ export const ScheduleGenerator: React.FC = () => {
       return [];
     }
 
-    const { startDate, dayOfWeek, frequency, presentersPerSession } = state.config;
-    const participants = [...state.participants];
-    const schedule: ScheduleSession[] = [];
-    
-    // 参加者をシャッフル
-    const shuffledParticipants = participants.sort(() => Math.random() - 0.5);
-    
-    // 開始日を設定された曜日に調整
-    let currentDate = new Date(startDate);
-    const startDayOfWeek = currentDate.getDay();
-    
-    if (startDayOfWeek !== dayOfWeek) {
-      // 次の指定曜日まで日付を進める
-      const daysToAdd = (dayOfWeek - startDayOfWeek + 7) % 7;
-      currentDate = addWeeks(currentDate, 0);
-      currentDate.setDate(currentDate.getDate() + daysToAdd);
-    }
-    
-    let weekNumber = 1;
-    let participantIndex = 0;
-    
-    // 全員が発表するまでスケジュールを生成
-    while (participantIndex < shuffledParticipants.length) {
-      const presenters: Participant[] = [];
-      
-      // 1回あたりの発表者数分を選択
-      for (let i = 0; i < presentersPerSession && participantIndex < shuffledParticipants.length; i++) {
-        presenters.push(shuffledParticipants[participantIndex]);
-        participantIndex++;
-      }
-      
-      if (presenters.length > 0) {
-        schedule.push({
-          date: new Date(currentDate),
-          presenters,
-          weekNumber
-        });
-        
-        // 次の開催日を計算
-        currentDate = addWeeks(currentDate, frequency);
-        weekNumber += frequency;
-      }
-    }
-    
-    return schedule;
+    return generateScheduleUtil(state.participants, state.config);
   };
 
   const handleGenerate = () => {
@@ -79,6 +36,15 @@ export const ScheduleGenerator: React.FC = () => {
 
     try {
       const newSchedule = generateSchedule();
+      
+      if (newSchedule.length === 0) {
+        toast({
+          title: "警告",
+          description: "スケジュールが生成されませんでした。設定を確認してください。",
+          variant: "destructive",
+        });
+        return;
+      }
       
       setSchedule(newSchedule);
       toast({
@@ -109,7 +75,7 @@ export const ScheduleGenerator: React.FC = () => {
     const headers = ['日付', '週番号'];
     
     for (let i = 1; i <= maxPresenters; i++) {
-      headers.push(`ユーザ名${i}`, `ユーザ${i}Slack ID`);
+      headers.push(`ユーザ名${i}`);
     }
     
     const csvContent: string[][] = [headers];
@@ -123,11 +89,11 @@ export const ScheduleGenerator: React.FC = () => {
       
       // 各発表者の情報を横に展開
       session.presenters.forEach(presenter => {
-        row.push(presenter.name, presenter.slackId);
+        row.push(presenter.name);
       });
       
       // 空のセルを埋める（発表者数が最大数に満たない場合）
-      const remainingCells = (maxPresenters - session.presenters.length) * 2;
+      const remainingCells = maxPresenters - session.presenters.length;
       for (let i = 0; i < remainingCells; i++) {
         row.push('');
       }
