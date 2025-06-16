@@ -23,56 +23,55 @@ export const ScheduleList: React.FC = () => {
   }
 
   return (
-    <Card className="bg-gradient-to-r from-purple-50 via-pink-50 to-orange-50 border-purple-200 shadow-lg">
+    <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 bg-clip-text text-transparent">
-          <Calendar className="h-5 w-5 text-purple-600" />
+        <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 bg-clip-text text-transparent">
+          <Calendar className="h-5 w-5 text-orange-500" />
           生成されたスケジュール
         </CardTitle>
-        <CardDescription className="text-purple-700">
+        <CardDescription>
           全{state.schedule.length}回分のライトニングトークスケジュール
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-lg overflow-hidden border border-purple-200 shadow-sm">
+        <div className="rounded-lg overflow-hidden border shadow-sm">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gradient-to-r from-purple-100 to-pink-100">
-                <TableHead className="font-semibold text-purple-800">日付</TableHead>
-                <TableHead className="font-semibold text-purple-800">曜日</TableHead>
-                <TableHead className="font-semibold text-purple-800">週番号</TableHead>
-                <TableHead className="font-semibold text-purple-800">発表者</TableHead>
+              <TableRow>
+                <TableHead className="font-semibold">日付</TableHead>
+                <TableHead className="font-semibold">曜日</TableHead>
+                <TableHead className="font-semibold">週番号</TableHead>
+                <TableHead className="font-semibold">発表者</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {state.schedule.map((session, index) => (
                 <TableRow 
                   key={index}
-                  className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-colors"
+                  className="hover:bg-muted/50 transition-colors"
                 >
                   <TableCell className="font-medium">
                     {format(session.date, 'yyyy年M月d日', { locale: ja })}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border-blue-300">
+                    <Badge variant="outline">
                       {format(session.date, 'EEEE', { locale: ja })}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4 text-pink-500" />
-                      <span className="text-slate-700">第{session.weekNumber}週</span>
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span>第{session.weekNumber}週</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-orange-500" />
+                      <Users className="h-4 w-4 text-muted-foreground" />
                       <div className="flex flex-wrap gap-1">
                         {session.presenters.map((presenter, pIndex) => (
                           <Badge 
                             key={pIndex}
                             variant="secondary"
-                            className="bg-gradient-to-r from-orange-100 to-pink-100 text-orange-800 border-orange-300"
                           >
                             {presenter.name}
                           </Badge>
@@ -88,7 +87,7 @@ export const ScheduleList: React.FC = () => {
         
         {state.lastGenerated && (
           <div className="mt-4 text-center">
-            <p className="text-sm text-purple-600">
+            <p className="text-sm text-muted-foreground">
               最終生成日時: {format(state.lastGenerated, 'yyyy年M月d日 HH:mm', { locale: ja })}
             </p>
           </div>
