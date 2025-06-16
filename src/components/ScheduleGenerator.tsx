@@ -1,20 +1,59 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Calendar, Download, Play, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useToast } from '../hooks/use-toast';
-import { ScheduleSession } from '../types';
+import { ScheduleSession, Participant } from '../types';
 import { generateSchedule as generateScheduleUtil } from '../utils/scheduleGenerator';
+import { saveScheduleToSupabase, getLatestScheduleWithSessions } from '../lib/scheduleService';
 
 export const ScheduleGenerator: React.FC = () => {
   const { state, setSchedule } = useApp();
   const { toast } = useToast();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingFromSupabase, setIsLoadingFromSupabase] = useState(true);
 
   const canGenerate = state.participants.length > 0 && state.config?.startDate;
+
+  // 初期描画時にSupabaseから最新のスケジュールを取得
+  useEffect(() => {
+    const loadLatestSchedule = async () => {
+      try {
+        const result = await getLatestScheduleWithSessions();
+        
+        if (result.success && result.sessions.length > 0) {
+          // Supabaseのデータを変換してAppStateの形式に合わせる
+          const convertedSessions: ScheduleSession[] = result.sessions.map((session, index) => ({
+            date: parseISO(session.date),
+            presenters: session.presenters.map((p: any) => ({
+              id: p.participant_id,
+              name: p.participant_name,
+              slackId: p.slack_id
+            } as Participant)),
+            weekNumber: index + 1 // 仮の週番号（実際の計算が必要な場合は後で修正）
+          }));
+          
+          setSchedule(convertedSessions);
+          
+          toast({
+            title: "スケジュール読み込み完了",
+            description: `保存されたスケジュール（${convertedSessions.length}回分）を読み込みました。`,
+          });
+        }
+      } catch (error) {
+        console.error('Error loading schedule from Supabase:', error);
+        // エラーが発生してもアプリの動作は継続
+      } finally {
+        setIsLoadingFromSupabase(false);
+      }
+    };
+    
+    loadLatestSchedule();
+  }, []); // 依存配列を空にして初回のみ実行
 
   const generateSchedule = (): ScheduleSession[] => {
     if (!state.config || state.participants.length === 0) {
@@ -24,8 +63,8 @@ export const ScheduleGenerator: React.FC = () => {
     return generateScheduleUtil(state.participants, state.config);
   };
 
-  const handleGenerate = () => {
-    if (!canGenerate) {
+  const handleGenerate = async () => {
+    if (!canGenerate || !state.config) {
       toast({
         title: "エラー",
         description: "参加者とスケジュール設定を完了してください。",
@@ -34,6 +73,7 @@ export const ScheduleGenerator: React.FC = () => {
       return;
     }
 
+    setIsGenerating(true);
     try {
       const newSchedule = generateSchedule();
       
@@ -47,16 +87,35 @@ export const ScheduleGenerator: React.FC = () => {
       }
       
       setSchedule(newSchedule);
-      toast({
-        title: "スケジュール生成完了",
-        description: `${newSchedule.length}回分のスケジュールを生成しました。`,
-      });
+      
+      // Supabaseに自動保存
+      const scheduleName = `LTスケジュール ${format(new Date(), 'yyyy年MM月dd日')}`;
+      const result = await saveScheduleToSupabase(
+        scheduleName,
+        state.config,
+        newSchedule
+      );
+
+      if (result.success) {
+        toast({
+          title: "スケジュール生成・保存完了",
+          description: `${newSchedule.length}回分のスケジュールを生成し、Supabaseに保存しました。`,
+        });
+      } else {
+        toast({
+          title: "スケジュール生成完了（保存エラー）",
+          description: `スケジュールは生成されましたが、保存中にエラーが発生しました。`,
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       toast({
         title: "生成エラー",
         description: "スケジュールの生成中にエラーが発生しました。",
         variant: "destructive",
       });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -123,6 +182,7 @@ export const ScheduleGenerator: React.FC = () => {
     });
   };
 
+
   return (
     <Card>
       <CardHeader>
@@ -154,12 +214,26 @@ export const ScheduleGenerator: React.FC = () => {
         {/* Generate Button */}
         <Button 
           onClick={handleGenerate} 
-          disabled={!canGenerate}
+          disabled={!canGenerate || isGenerating || isLoadingFromSupabase}
           className="w-full"
           size="lg"
         >
-          <Play className="h-4 w-4 mr-2" />
-          スケジュール生成
+          {isLoadingFromSupabase ? (
+            <>
+              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              読み込み中...
+            </>
+          ) : isGenerating ? (
+            <>
+              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              生成中...
+            </>
+          ) : (
+            <>
+              <Play className="h-4 w-4 mr-2" />
+              スケジュール生成
+            </>
+          )}
         </Button>
 
         {/* Schedule Preview */}
@@ -209,11 +283,21 @@ export const ScheduleGenerator: React.FC = () => {
         )}
 
         {/* Empty State */}
-        {state.schedule.length === 0 && (
+        {state.schedule.length === 0 && !isLoadingFromSupabase && (
           <div className="text-center py-8 text-muted-foreground">
             <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm">
               スケジュールを生成すると、ここに表示されます
+            </p>
+          </div>
+        )}
+        
+        {/* Loading State */}
+        {isLoadingFromSupabase && (
+          <div className="text-center py-8 text-muted-foreground">
+            <div className="h-8 w-8 mx-auto mb-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-sm">
+              保存されたスケジュールを読み込み中...
             </p>
           </div>
         )}

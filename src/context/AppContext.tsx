@@ -1,15 +1,22 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { AppState, Participant, ScheduleConfig, ScheduleSession } from '../types';
+import {
+  getAllParticipantsFromSupabase,
+  addParticipantToSupabase,
+  updateParticipantInSupabase,
+  deleteParticipantFromSupabase
+} from '../lib/participantService';
 
 interface AppContextType {
   state: AppState;
-  addParticipant: (participant: Omit<Participant, 'id'>) => void;
-  removeParticipant: (id: string) => void;
-  updateParticipant: (id: string, updates: Partial<Participant>) => void;
-  bulkAddParticipants: (participants: Omit<Participant, 'id'>[]) => void;
+  addParticipant: (participant: Omit<Participant, 'id'>) => Promise<void>;
+  removeParticipant: (id: string) => Promise<void>;
+  updateParticipant: (id: string, updates: Partial<Participant>) => Promise<void>;
+  bulkAddParticipants: (participants: Omit<Participant, 'id'>[]) => Promise<void>;
   setConfig: (config: ScheduleConfig) => void;
   setSchedule: (schedule: ScheduleSession[]) => void;
   clearAll: () => void;
+  isLoadingParticipants: boolean;
 }
 
 type AppAction =
@@ -88,45 +95,77 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const [isLoadingParticipants, setIsLoadingParticipants] = React.useState(true);
 
-  // 参加者データのみをlocalStorageから読み込み
+  // 初期描画時にSupabaseから参加者データを読み込み
   useEffect(() => {
-    try {
-      const savedParticipants = localStorage.getItem('ltSchedulerParticipants');
-      if (savedParticipants) {
-        const participants = JSON.parse(savedParticipants);
-        if (Array.isArray(participants) && participants.length > 0) {
-          dispatch({ type: 'LOAD_PARTICIPANTS', payload: participants });
+    const loadParticipants = async () => {
+      try {
+        const result = await getAllParticipantsFromSupabase();
+        if (result.success) {
+          dispatch({ type: 'LOAD_PARTICIPANTS', payload: result.participants });
         }
+      } catch (error) {
+        console.error('Failed to load participants from Supabase:', error);
+      } finally {
+        setIsLoadingParticipants(false);
       }
-    } catch (error) {
-      console.error('Failed to load participants from localStorage:', error);
-    }
+    };
+    
+    loadParticipants();
   }, []);
 
-  // 参加者データのみをlocalStorageに保存
-  useEffect(() => {
-    try {
-      localStorage.setItem('ltSchedulerParticipants', JSON.stringify(state.participants));
-    } catch (error) {
-      console.error('Failed to save participants to localStorage:', error);
+  const addParticipant = async (participant: Omit<Participant, 'id'>) => {
+    const result = await addParticipantToSupabase(participant);
+    if (result.success && result.participant) {
+      dispatch({ type: 'LOAD_PARTICIPANTS', payload: [...state.participants, result.participant] });
+    } else {
+      throw new Error('参加者の追加に失敗しました');
     }
-  }, [state.participants]);
-
-  const addParticipant = (participant: Omit<Participant, 'id'>) => {
-    dispatch({ type: 'ADD_PARTICIPANT', payload: participant });
   };
 
-  const removeParticipant = (id: string) => {
-    dispatch({ type: 'REMOVE_PARTICIPANT', payload: id });
+  const removeParticipant = async (id: string) => {
+    const result = await deleteParticipantFromSupabase(id);
+    if (result.success) {
+      dispatch({ type: 'REMOVE_PARTICIPANT', payload: id });
+    } else {
+      throw new Error('参加者の削除に失敗しました');
+    }
   };
 
-  const updateParticipant = (id: string, updates: Partial<Participant>) => {
-    dispatch({ type: 'UPDATE_PARTICIPANT', payload: { id, updates } });
+  const updateParticipant = async (id: string, updates: Partial<Participant>) => {
+    const result = await updateParticipantInSupabase(id, updates);
+    if (result.success && result.participant) {
+      dispatch({ type: 'UPDATE_PARTICIPANT', payload: { id, updates } });
+    } else {
+      throw new Error('参加者の更新に失敗しました');
+    }
   };
 
-  const bulkAddParticipants = (participants: Omit<Participant, 'id'>[]) => {
-    dispatch({ type: 'BULK_ADD_PARTICIPANTS', payload: participants });
+  const bulkAddParticipants = async (participants: Omit<Participant, 'id'>[]) => {
+    try {
+      const results = await Promise.all(
+        participants.map(p => addParticipantToSupabase(p))
+      );
+      
+      const successfulParticipants = results
+        .filter(r => r.success && r.participant)
+        .map(r => r.participant!);
+      
+      if (successfulParticipants.length > 0) {
+        dispatch({ 
+          type: 'LOAD_PARTICIPANTS', 
+          payload: [...state.participants, ...successfulParticipants] 
+        });
+      }
+      
+      const failedCount = participants.length - successfulParticipants.length;
+      if (failedCount > 0) {
+        throw new Error(`${failedCount}件の参加者追加に失敗しました`);
+      }
+    } catch (error) {
+      throw error;
+    }
   };
 
   const setConfig = (config: ScheduleConfig) => {
@@ -152,6 +191,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setConfig,
         setSchedule,
         clearAll,
+        isLoadingParticipants,
       }}
     >
       {children}

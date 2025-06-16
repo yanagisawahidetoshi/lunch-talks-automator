@@ -1,6 +1,16 @@
 import { addWeeks, addDays } from 'date-fns';
 import { Participant, ScheduleConfig, ScheduleSession } from '../types';
 
+// Fisher-Yates シャッフルアルゴリズムによる真のランダムシャッフル
+const shuffleArray = <T>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 export const generateSchedule = (
   participants: Participant[],
   config: ScheduleConfig
@@ -12,8 +22,8 @@ export const generateSchedule = (
   const { startDate, dayOfWeek, frequency, presentersPerSession } = config;
   const schedule: ScheduleSession[] = [];
   
-  // 参加者をシャッフル
-  const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5);
+  // 参加者を真にランダムにシャッフル
+  const shuffledParticipants = shuffleArray(participants);
   
   // 開始日を設定された曜日に調整
   let currentDate = new Date(startDate);
