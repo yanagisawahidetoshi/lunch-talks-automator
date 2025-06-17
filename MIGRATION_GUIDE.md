@@ -84,7 +84,29 @@ npm run prisma:push
 - `PUT /api/schedules` - スケジュール更新
 - `DELETE /api/schedules?id={id}` - スケジュール削除
 
-## トラブルシューティング
+## データのインポート
+
+### CSVファイルからのインポート
+
+CSVファイルから登壇者とスケジュールをインポートできます：
+
+```bash
+# CSVファイルを指定してインポート
+npm run seed:csv "ランチLT当番表順番表.csv"
+```
+
+CSVファイルの形式：
+- A列: 日付（YYYY/MM/DD形式）
+- B列: 登壇者1
+- E列: 登壇者2
+
+### テストデータの作成
+
+テスト用のサンプルデータを作成：
+
+```bash
+npm run seed:test
+```
 
 ### ビルドエラーが出る場合
 
