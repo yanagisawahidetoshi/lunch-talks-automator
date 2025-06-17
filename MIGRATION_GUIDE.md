@@ -75,10 +75,14 @@ npm run prisma:push
 
 ## APIエンドポイント
 
-- `GET /api/users` - ユーザー一覧取得
-- `POST /api/users` - ユーザー作成
-- `GET /api/talks` - トーク一覧取得
-- `POST /api/talks` - トーク作成
+- `GET /api/participants` - 参加者一覧取得
+- `POST /api/participants` - 参加者作成
+- `PUT /api/participants` - 参加者更新
+- `DELETE /api/participants?id={id}` - 参加者削除
+- `GET /api/schedules` - スケジュール一覧取得
+- `POST /api/schedules` - スケジュール作成
+- `PUT /api/schedules` - スケジュール更新
+- `DELETE /api/schedules?id={id}` - スケジュール削除
 
 ## トラブルシューティング
 

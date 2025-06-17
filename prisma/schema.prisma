@@ -10,24 +10,51 @@ datasource db {
   url = env("DATABASE_URL")
 }
 
-// Example schema for lunch talks automator
-model User {
+// 参加者テーブル
+model Participant {
   id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  talks     Talk[]
+  name      String
+  slackId   String?  @map("slack_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // リレーション
+  schedules ScheduleParticipant[]
+  
+  @@map("participants")
 }
 
-model Talk {
+// スケジュールテーブル
+model Schedule {
   id          String   @id @default(cuid())
   title       String
-  description String?
-  speaker     User     @relation(fields: [speakerId], references: [id])
-  speakerId   String
   date        DateTime
-  duration    Int      // in minutes
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  duration    Int      // 分単位
+  location    String?
+  description String?
+  status      String   @default("scheduled")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // リレーション
+  participants ScheduleParticipant[]
+  
+  @@map("schedules")
+}
+
+// 中間テーブル（スケジュールと参加者の多対多）
+model ScheduleParticipant {
+  id            String      @id @default(cuid())
+  scheduleId    String      @map("schedule_id")
+  participantId String      @map("participant_id")
+  role          String      @default("speaker") // speaker, organizer, attendee
+  order         Int?        // 発表順序
+  createdAt     DateTime    @default(now()) @map("created_at")
+  
+  // リレーション
+  schedule    Schedule    @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  
+  @@unique([scheduleId, participantId])
+  @@map("schedule_participants")
 }
