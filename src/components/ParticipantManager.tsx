@@ -98,24 +98,24 @@ export const ParticipantManager: React.FC = () => {
         }
       }
 
-      // 重複があった場合の警告
+      if (importData.length === 0) {
+        toast({
+          title: "エラー",
+          description: duplicates.length > 0 
+            ? `すべてのデータが重複のためインポートできませんでした。重複データ: ${duplicates.join(', ')}`
+            : "有効なデータが見つかりません。1行に1つの名前を入力してください。",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 重複があった場合の警告（インポート処理前に表示）
       if (duplicates.length > 0) {
         toast({
           title: "重複データを検出",
           description: `以下の参加者は既に登録されているためスキップされます: ${duplicates.join(', ')}`,
           variant: "destructive",
         });
-      }
-
-      if (importData.length === 0) {
-        toast({
-          title: "エラー",
-          description: duplicates.length > 0 
-            ? "すべてのデータが重複のためインポートできませんでした。"
-            : "有効なデータが見つかりません。1行に1つの名前を入力してください。",
-          variant: "destructive",
-        });
-        return;
       }
 
       setIsBulkImporting(true);

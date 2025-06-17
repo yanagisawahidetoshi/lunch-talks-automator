@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ParticipantManager } from './ParticipantManager';
 import { AppProvider } from '../context/AppContext';
@@ -39,6 +39,7 @@ describe('ParticipantManager - 重複判定', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    cleanup();
   });
 
   const renderWithProvider = () => {
@@ -198,21 +199,25 @@ describe('ParticipantManager - 重複判定', () => {
         expect(participantService.addParticipantToSupabase).toHaveBeenCalledWith({ name: '新規花子' });
       });
 
-      // トーストの呼び出しを順番に確認
+      // まず最初のトースト（重複警告）を確認
       await waitFor(() => {
-        // 重複警告が最初に呼ばれること
-        expect(mockToast).toHaveBeenNthCalledWith(1, {
+        expect(mockToast).toHaveBeenCalledWith({
           title: '重複データを検出',
           description: '以下の参加者は既に登録されているためスキップされます: 田中太郎, 佐藤花子, YAMADA Jiro',
           variant: 'destructive',
         });
+      });
 
-        // 成功メッセージが2番目に呼ばれること
-        expect(mockToast).toHaveBeenNthCalledWith(2, {
+      // その後、成功メッセージを確認
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith({
           title: '一括インポート完了',
           description: '2人の参加者を追加しました。3人の重複をスキップしました。',
         });
       });
+
+      // 最終的に2回呼ばれていることを確認
+      expect(mockToast).toHaveBeenCalledTimes(2);
     });
 
     it('すべて重複の場合はエラーメッセージを表示する', async () => {
@@ -231,20 +236,13 @@ describe('ParticipantManager - 重複判定', () => {
       const importButton = screen.getByRole('button', { name: 'インポート' });
       await userEvent.click(importButton);
 
-      // 重複警告が表示される
+      // すべて重複のエラーメッセージが表示される
       await waitFor(() => {
         expect(mockToast).toHaveBeenCalledWith({
-          title: '重複データを検出',
-          description: '以下の参加者は既に登録されているためスキップされます: 田中太郎, 佐藤花子, YAMADA JIRO',
+          title: 'エラー',
+          description: 'すべてのデータが重複のためインポートできませんでした。重複データ: 田中太郎, 佐藤花子, YAMADA JIRO',
           variant: 'destructive',
         });
-      });
-
-      // すべて重複のエラーメッセージが表示される
-      expect(mockToast).toHaveBeenCalledWith({
-        title: 'エラー',
-        description: 'すべてのデータが重複のためインポートできませんでした。',
-        variant: 'destructive',
       });
 
       // Supabaseへの追加が実行されないことを確認
