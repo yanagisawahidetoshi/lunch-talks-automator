@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:prisma && vite build",
+    "build:prisma": "prisma generate",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
