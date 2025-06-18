@@ -18,9 +18,11 @@
     "prisma:push:local": "dotenv -e .env.local -- prisma db push",
     "prisma:studio": "prisma studio",
     "seed:csv": "tsx scripts/import-csv.ts",
-    "seed:test": "tsx scripts/seed-test-data.ts"
+    "seed:test": "tsx scripts/seed-test-data.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@vercel/node": "^3.0.0",
     "@vercel/postgres": "^0.5.1",
     "prisma": "^5.7.1",
     "@prisma/client": "^5.7.1",
