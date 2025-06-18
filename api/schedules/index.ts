@@ -21,7 +21,11 @@ export default async function handler(
       });
       return res.status(200).json(schedules);
     } catch (error) {
-      return res.status(500).json({ error: 'Failed to fetch schedules' });
+      console.error('Database error:', error);
+      return res.status(500).json({ 
+        error: 'Failed to fetch schedules',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   }
 
