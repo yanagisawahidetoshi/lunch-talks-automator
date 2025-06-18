@@ -1,0 +1,47 @@
+name: Keep Supabase Active
+
+on:
+  schedule:
+    # 毎週月曜日と木曜日の午前9時（UTC）に実行
+    # 日本時間では午後6時
+    - cron: '0 9 * * 1,4'
+  workflow_dispatch: # 手動実行も可能
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Supabase Database
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          echo "🏓 Supabaseにアクセスして休止を防ぎます..."
+          
+          # Supabaseにアクセスして休止を防ぐ
+          response=$(curl -s -X GET "${VITE_SUPABASE_URL}/rest/v1/participants?limit=1" \
+            -H "apikey: ${VITE_SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${VITE_SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -w "\n%{http_code}")
+          
+          http_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "HTTPステータス: $http_code"
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Supabaseへのアクセスに成功しました"
+            echo "レスポンス: $body"
+          else
+            echo "❌ エラーが発生しました"
+            echo "ステータスコード: $http_code"
+            echo "レスポンス: $body"
+            exit 1
+          fi
+      
+      - name: Log timestamp
+        run: |
+          echo "実行時刻: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "実行時刻 (JST): $(TZ='Asia/Tokyo' date '+%Y-%m-%d %H:%M:%S JST')"
