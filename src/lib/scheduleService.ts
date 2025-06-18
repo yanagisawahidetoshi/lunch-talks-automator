@@ -1,7 +1,7 @@
-import { supabase } from './supabase'
 import type { ScheduleSession } from '@/types'
-import type { ScheduleRecord, ScheduleSessionRecord } from '@/types/supabase'
 import { format } from 'date-fns'
+
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 export async function saveScheduleToSupabase(
   name: string,
@@ -14,143 +14,103 @@ export async function saveScheduleToSupabase(
   sessions: ScheduleSession[]
 ) {
   try {
-    // frequencyを文字列に変換（1: weekly, 2: biweekly）
-    const frequencyString = config.frequency === 1 ? 'weekly' : 'biweekly';
-    
-    // 1. スケジュールのメインレコードを作成
-    const { data: schedule, error: scheduleError } = await supabase
-      .from('schedules')
-      .insert({
-        name,
-        start_date: format(config.startDate, 'yyyy-MM-dd'),
-        days_of_week: [config.dayOfWeek], // 単一の曜日を配列に変換
-        frequency: frequencyString,
-        presenters_per_session: config.presentersPerSession,
+    // スケジュールを作成（セッションごとに）
+    const promises = sessions.map(session => 
+      fetch(`${API_URL}/api/schedules`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: `${name} - ${format(session.date, 'yyyy/MM/dd')}`,
+          date: session.date.toISOString(),
+          duration: 60, // デフォルト60分
+          description: `発表者: ${session.presenters.map(p => p.name).join(', ')}`,
+          participants: session.presenters.map((p, idx) => ({
+            participantId: p.id,
+            role: 'speaker',
+            order: idx,
+          })),
+        }),
       })
-      .select()
-      .single()
+    )
 
-    if (scheduleError) {
-      throw scheduleError
+    const responses = await Promise.all(promises)
+    const allOk = responses.every(r => r.ok)
+
+    if (!allOk) {
+      throw new Error('Failed to save some schedules')
     }
 
-    // 2. セッションレコードを作成
-    const sessionRecords: Omit<ScheduleSessionRecord, 'id'>[] = sessions.map(session => ({
-      schedule_id: schedule.id,
-      date: format(session.date, 'yyyy-MM-dd'),
-      presenters: session.presenters.map(p => ({
-        participant_id: p.id,
-        participant_name: p.name,
-        slack_id: p.slackId,
-      })),
-    }))
-
-    const { error: sessionsError } = await supabase
-      .from('schedule_sessions')
-      .insert(sessionRecords)
-
-    if (sessionsError) {
-      throw sessionsError
-    }
-
-    return { success: true, scheduleId: schedule.id }
+    return { success: true }
   } catch (error) {
-    console.error('Error saving schedule to Supabase:', error)
+    console.error('Error saving schedule:', error)
     return { success: false, error }
   }
 }
 
 export async function getScheduleFromSupabase(scheduleId: string) {
   try {
-    // スケジュールメインレコードを取得
-    const { data: schedule, error: scheduleError } = await supabase
-      .from('schedules')
-      .select('*')
-      .eq('id', scheduleId)
-      .single()
-
-    if (scheduleError) {
-      throw scheduleError
+    const response = await fetch(`${API_URL}/api/schedules?id=${scheduleId}`)
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch schedule')
     }
 
-    // セッションレコードを取得
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('schedule_sessions')
-      .select('*')
-      .eq('schedule_id', scheduleId)
-      .order('date', { ascending: true })
-
-    if (sessionsError) {
-      throw sessionsError
-    }
-
+    const schedule = await response.json()
+    
     return { 
       success: true, 
-      schedule: {
-        ...schedule,
-        sessions
-      }
+      schedule
     }
   } catch (error) {
-    console.error('Error fetching schedule from Supabase:', error)
+    console.error('Error fetching schedule:', error)
     return { success: false, error }
   }
 }
 
 export async function getAllSchedulesFromSupabase() {
   try {
-    const { data: schedules, error } = await supabase
-      .from('schedules')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      throw error
+    const response = await fetch(`${API_URL}/api/schedules`)
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch schedules')
     }
 
+    const schedules = await response.json()
+    
     return { success: true, schedules }
   } catch (error) {
-    console.error('Error fetching schedules from Supabase:', error)
+    console.error('Error fetching schedules:', error)
     return { success: false, error }
   }
 }
 
 export async function getLatestScheduleWithSessions() {
   try {
-    // 最新のスケジュールを取得
-    const { data: schedule, error: scheduleError } = await supabase
-      .from('schedules')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (scheduleError) {
-      if (scheduleError.code === 'PGRST116') {
-        // データが存在しない場合
-        return { success: true, schedule: null, sessions: [] }
-      }
-      throw scheduleError
+    const response = await fetch(`${API_URL}/api/schedules`)
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch schedules')
     }
 
-    // そのスケジュールのセッションを取得
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('schedule_sessions')
-      .select('*')
-      .eq('schedule_id', schedule.id)
-      .order('date', { ascending: true })
-
-    if (sessionsError) {
-      throw sessionsError
+    const schedules = await response.json()
+    
+    if (schedules.length === 0) {
+      return { success: true, schedule: null, sessions: [] }
     }
 
+    // グループ化して最新のスケジュールグループを見つける
+    // TODO: より良い実装に変更
+    const latestSchedule = schedules[0]
+    
     return { 
       success: true, 
-      schedule,
-      sessions: sessions || []
+      schedule: latestSchedule,
+      sessions: schedules
     }
   } catch (error) {
-    console.error('Error fetching latest schedule from Supabase:', error)
+    console.error('Error fetching latest schedule:', error)
     return { success: false, error }
   }
 }
